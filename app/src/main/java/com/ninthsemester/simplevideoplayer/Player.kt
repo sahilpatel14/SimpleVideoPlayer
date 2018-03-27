@@ -29,11 +29,6 @@ import javax.xml.transform.Source
  * Created by sahil-mac on 26/03/18.
  */
 
-val mediaMap = mapOf<SourceType, Uri>(
-        SourceType.local_audio to Uri.parse("asset:///sample_audio_file.mp3"),
-        SourceType.local_video to Uri.parse("asset:///ed_hd.mp4")
-)
-
 enum class SourceType {
     local_audio, local_video, http_audio, http_video, playlist
 }
@@ -66,12 +61,6 @@ class PlayerHolder (val context: Context,
             playerView.player = it
             info { "SimpleExoPlayer created" }
         }
-
-//        player = ExoPlayerFactory.newSimpleInstance(context, DefaultTrackSelector())
-//                .also {
-//                    playerView.player = it
-//                    info { "SimpleExoPlayer created" }
-//                }
     }
 
     fun start() {
@@ -90,25 +79,19 @@ class PlayerHolder (val context: Context,
 
 
     private fun buildMediaSource(source: SourceType): MediaSource {
-        return when(source) {
-            SourceType.playlist -> {
-                ConcatenatingMediaSource(
-                        createExtractorMediaSource(SourceType.local_audio),
-                        createExtractorMediaSource(SourceType.local_video),
-                        createExtractorMediaSource(SourceType.http_audio),
-                        createExtractorMediaSource(SourceType.http_video)
-                )
-            }
-            else -> {
-                createExtractorMediaSource(source)
-            }
+
+        val uriList = mutableListOf<MediaSource>()
+        VideoActivity.MediaCatalog.list.forEach {
+            uriList.add(createExtractorMediaSource(it.mediaUri!!))
         }
+
+        return ConcatenatingMediaSource(*uriList.toTypedArray())
     }
 
-    private fun createExtractorMediaSource(sourceType: SourceType): MediaSource {
+    private fun createExtractorMediaSource(uri : Uri): MediaSource {
         return ExtractorMediaSource.Factory(
                 DefaultDataSourceFactory(context, "exoplayer-learning"))
-                .createMediaSource(mediaMap[sourceType])
+                .createMediaSource(uri)
     }
 
     fun stop(){
