@@ -14,7 +14,10 @@ import android.support.v4.media.AudioAttributesCompat
 import com.google.android.exoplayer2.DefaultLoadControl
 import com.google.android.exoplayer2.DefaultRenderersFactory
 import com.google.android.exoplayer2.ExoPlayerFactory
+import com.google.android.exoplayer2.source.ConcatenatingMediaSource
+import com.google.android.exoplayer2.source.DynamicConcatenatingMediaSource
 import com.google.android.exoplayer2.source.ExtractorMediaSource
+import com.google.android.exoplayer2.source.MediaSource
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
 import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
@@ -25,6 +28,11 @@ import javax.xml.transform.Source
 /**
  * Created by sahil-mac on 26/03/18.
  */
+
+val mediaMap = mapOf<SourceType, Uri>(
+        SourceType.local_audio to Uri.parse("asset:///sample_audio_file.mp3"),
+        SourceType.local_video to Uri.parse("asset:///ed_hd.mp4")
+)
 
 enum class SourceType {
     local_audio, local_video, http_audio, http_video, playlist
@@ -68,7 +76,7 @@ class PlayerHolder (val context: Context,
 
     fun start() {
         //  Load media
-        player.prepare(buildMediaSource(selectMediaToPlay(playerState.source)))
+        player.prepare(buildMediaSource(playerState.source))
 
         //  Restore state(after onResume()/onStart()
         with(playerState) {
@@ -80,21 +88,27 @@ class PlayerHolder (val context: Context,
 
     }
 
-    private fun selectMediaToPlay(source: SourceType) : Uri {
 
+    private fun buildMediaSource(source: SourceType): MediaSource {
         return when(source) {
-            SourceType.local_audio -> Uri.parse("asset:///sample_audio_file.mp3")
-            SourceType.local_video -> Uri.parse("asset:///video/file.mp4")
-            SourceType.http_audio -> Uri.parse("http://site.../file.mp3")
-            SourceType.http_video -> Uri.parse("http://site.../file.mp4")
-            SourceType.playlist -> Uri.EMPTY
+            SourceType.playlist -> {
+                ConcatenatingMediaSource(
+                        createExtractorMediaSource(SourceType.local_audio),
+                        createExtractorMediaSource(SourceType.local_video),
+                        createExtractorMediaSource(SourceType.http_audio),
+                        createExtractorMediaSource(SourceType.http_video)
+                )
+            }
+            else -> {
+                createExtractorMediaSource(source)
+            }
         }
-
     }
 
-    private fun buildMediaSource(uri : Uri): ExtractorMediaSource {
+    private fun createExtractorMediaSource(sourceType: SourceType): MediaSource {
         return ExtractorMediaSource.Factory(
-                DefaultDataSourceFactory(context, "videoapp")).createMediaSource(uri)
+                DefaultDataSourceFactory(context, "exoplayer-learning"))
+                .createMediaSource(mediaMap[sourceType])
     }
 
     fun stop(){
