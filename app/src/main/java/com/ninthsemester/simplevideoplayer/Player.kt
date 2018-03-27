@@ -22,6 +22,7 @@ import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
 import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
 import org.jetbrains.anko.info
+import org.jetbrains.anko.warn
 import javax.xml.transform.Source
 
 
@@ -56,42 +57,33 @@ class PlayerHolder(val context: Context,
         player = AudioFocusWrapper(
                 audioAttributes,
                 audioManager,
-                ExoPlayerFactory.newSimpleInstance(
-                        //  Renders audio, video, text (subtitles) content,
-                        DefaultRenderersFactory(context),
+                ExoPlayerFactory.newSimpleInstance(this.context, DefaultTrackSelector())
+                        .apply {
 
-                        // Choose best audio, video, text track from available sources,
-                        // based on bandwidth, device capabilities, language, etc
-                        DefaultTrackSelector(),
+                            //  Bind to the view
+                            playerView.player = this
 
-                        //  Manage buffering and loading data over the network
-                        DefaultLoadControl()
-                ).also {
-                    playerView.player = it
-                    info { "SimpleExoPlayer created" }
-                }
-        )
+                            //  Load media
+                            prepare(buildMediaSource())
+
+                            //  restore state after onResume()/onStart()
+                            with(playerState){
+                                // Start playback when media has buffered enough
+                                // (whenReady is true by default)
+
+                                playWhenReady = whenReady
+                                seekTo(window, position)
+                            }
+
+                            warn { "SimpleExoPlayer created" }
+
+                        })
     }
 
-    fun start() {
-        //  Load media
-        player.prepare(buildMediaSource(playerState.source))
-
-        //  Restore state(after onResume()/onStart()
-        with(playerState) {
-            player.playWhenReady = whenReady
-            player.seekTo(position)
-        }
-
-        info { "SimpleExoPlayer is started" }
-
-    }
-
-
-    private fun buildMediaSource(source: SourceType): MediaSource {
+    private fun buildMediaSource(): MediaSource {
 
         val uriList = mutableListOf<MediaSource>()
-        VideoActivity.MediaCatalog.list.forEach {
+        MediaLibrary.list.forEach {
             uriList.add(createExtractorMediaSource(it.mediaUri!!))
         }
 
@@ -104,21 +96,19 @@ class PlayerHolder(val context: Context,
                 .createMediaSource(uri)
     }
 
-    fun stop() {
-
-        //  Save state
-        with(playerState) {
-            position = player.currentPosition
-            window = player.currentWindowIndex
-            whenReady = player.playWhenReady
-        }
-
-        player.stop(true)
-
-        info { "SimpleExoPlayer is stopped" }
-    }
-
     fun release() {
-        info { "SimpleExoPlayer is released" }
+
+        with(player) {
+            //  Save State
+            with(playerState) {
+                position = currentPosition
+                window = currentWindowIndex
+                whenReady = playWhenReady
+            }
+
+            //  Release the player
+            release()
+        }
+        warn { "SimpleExoPlayer is released" }
     }
 }

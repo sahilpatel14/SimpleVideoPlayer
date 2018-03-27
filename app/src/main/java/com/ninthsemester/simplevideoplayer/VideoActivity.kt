@@ -1,27 +1,33 @@
 package com.ninthsemester.simplevideoplayer
 
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.support.annotation.RequiresApi
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
+import android.util.Rational
+import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
 import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
 import kotlinx.android.synthetic.main.activity_video.*
+import org.jetbrains.anko.toast
 
 class VideoActivity : AppCompatActivity() {
 
+    lateinit var mediaSession: MediaSessionCompat
+    private lateinit var connector: MediaSessionConnector
     private lateinit var playerHolder: PlayerHolder
     private val state = PlayerState()
 
-    lateinit var mediaSession: MediaSessionCompat
-    lateinit var connector: MediaSessionConnector
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video)
 
-        playerHolder = PlayerHolder(this, exoplayerview_activity_video,state)
         mediaSession = MediaSessionCompat(this, packageName)
         connector = MediaSessionConnector(mediaSession)
 
@@ -31,22 +37,45 @@ class VideoActivity : AppCompatActivity() {
         connector.setQueueNavigator(object : TimelineQueueNavigator(mediaSession) {
 
             override fun getMediaDescription(idx: Int): MediaDescriptionCompat {
-                return MediaCatalog.list[idx]
+                return MediaLibrary[idx]
             }
 
         })
     }
 
+
     override fun onStart() {
         super.onStart()
-        playerHolder.start()
+
+        playerHolder = PlayerHolder(this, exoplayerview_activity_video, state)
+
+        playerHolder.player.addListener(object : Player.DefaultEventListener() {
+
+            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+
+                when(playbackState) {
+                    Player.STATE_ENDED -> toast("playback ended")
+                    Player.STATE_READY -> when (playWhenReady) {
+                        true -> {
+                            toast("playback started")
+                        }
+                        false -> {
+                            toast("playback paused")
+                        }
+                    }
+                }
+            }
+
+        })
+
+//        playerHolder.start()
         connector.setPlayer(playerHolder.player, null)
         mediaSession.isActive = true
     }
 
     override fun onStop() {
         super.onStop()
-        playerHolder.stop()
+        playerHolder.release()
         connector.setPlayer(null, null)
         mediaSession.isActive = false
     }
@@ -54,7 +83,6 @@ class VideoActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         mediaSession.release()
-        playerHolder.release()
     }
 
     object MediaCatalog{
@@ -81,5 +109,24 @@ class VideoActivity : AppCompatActivity() {
                     }
             )
         }
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    override fun onUserLeaveHint() {
+
+        enterPictureInPictureMode(
+                with(PictureInPictureParams.Builder()) {
+                    val width = 16
+                    val height = 9
+                    setAspectRatio(Rational(width, height))
+                    build()
+                }
+        )
+    }
+
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration?) {
+        exoplayerview_activity_video.useController = !isInPictureInPictureMode
     }
 }
