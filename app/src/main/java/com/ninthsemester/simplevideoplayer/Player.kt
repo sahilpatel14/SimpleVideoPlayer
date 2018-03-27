@@ -34,33 +34,43 @@ enum class SourceType {
 }
 
 data class PlayerState(var window: Int = 0,
-                       var position : Long = 0,
-                       var whenReady : Boolean = true,
-                       var source : SourceType = SourceType.local_audio)
+                       var position: Long = 0,
+                       var whenReady: Boolean = true,
+                       var source: SourceType = SourceType.local_audio)
 
 
-class PlayerHolder (val context: Context,
-                    val playerView: PlayerView,
-                    val playerState: PlayerState) : AnkoLogger {
+class PlayerHolder(val context: Context,
+                   val playerView: PlayerView,
+                   val playerState: PlayerState) : AnkoLogger {
 
     val player: ExoPlayer
 
     init {
 
-        player = ExoPlayerFactory.newSimpleInstance(
-                //  Renders audio, video, text (subtitles) content,
-                DefaultRenderersFactory(context),
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val audioAttributes = AudioAttributesCompat.Builder()
+                .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
+                .setUsage(AudioAttributesCompat.USAGE_MEDIA)
+                .build()
 
-                // Choose best audio, video, text track from available sources,
-                // based on bandwidth, device capabilities, language, etc
-                DefaultTrackSelector(),
+        player = AudioFocusWrapper(
+                audioAttributes,
+                audioManager,
+                ExoPlayerFactory.newSimpleInstance(
+                        //  Renders audio, video, text (subtitles) content,
+                        DefaultRenderersFactory(context),
 
-                //  Manage buffering and loading data over the network
-                DefaultLoadControl()
-        ).also {
-            playerView.player = it
-            info { "SimpleExoPlayer created" }
-        }
+                        // Choose best audio, video, text track from available sources,
+                        // based on bandwidth, device capabilities, language, etc
+                        DefaultTrackSelector(),
+
+                        //  Manage buffering and loading data over the network
+                        DefaultLoadControl()
+                ).also {
+                    playerView.player = it
+                    info { "SimpleExoPlayer created" }
+                }
+        )
     }
 
     fun start() {
@@ -88,16 +98,16 @@ class PlayerHolder (val context: Context,
         return ConcatenatingMediaSource(*uriList.toTypedArray())
     }
 
-    private fun createExtractorMediaSource(uri : Uri): MediaSource {
+    private fun createExtractorMediaSource(uri: Uri): MediaSource {
         return ExtractorMediaSource.Factory(
                 DefaultDataSourceFactory(context, "exoplayer-learning"))
                 .createMediaSource(uri)
     }
 
-    fun stop(){
+    fun stop() {
 
         //  Save state
-        with(playerState){
+        with(playerState) {
             position = player.currentPosition
             window = player.currentWindowIndex
             whenReady = player.playWhenReady
@@ -108,7 +118,7 @@ class PlayerHolder (val context: Context,
         info { "SimpleExoPlayer is stopped" }
     }
 
-    fun release(){
+    fun release() {
         info { "SimpleExoPlayer is released" }
     }
 }
